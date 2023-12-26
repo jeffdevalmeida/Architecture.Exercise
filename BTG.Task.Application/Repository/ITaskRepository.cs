@@ -10,7 +10,7 @@ namespace BTG.Task.Application.Repository
 {
     public interface ITaskRepository : IReadWriteRepository<TaskAssignment>
     {
-        Task<IEnumerable<TaskAssignment>> GetActiveByAuthorAsync(Guid id, string author);
+        Task<IEnumerable<TaskAssignment>> GetActiveByAuthorAsync(string author);
         Task<IEnumerable<TaskAssignment>> GetByStatus(ETaskStatus status);
     }
 }

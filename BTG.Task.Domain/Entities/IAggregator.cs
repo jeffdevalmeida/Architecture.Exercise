@@ -8,6 +8,6 @@ namespace BTG.Task.Domain.Entities
 {
     public interface IAggregator
     {
-        Guid Id { get; }
+        string Id { get; } //Guid format as string
     }
 }

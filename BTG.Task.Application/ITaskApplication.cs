@@ -12,11 +12,11 @@ namespace BTG.Task.Application
 {
     public interface ITaskApplication
     {
-        Task<SingleResult<TaskAssignment>> CreateAsync(TaskAssignmentCreateDTO task);
-        Task<SingleResult<TaskAssignment>> UpdateAsync(Guid id, TaskAssignmentUpdateDTO task);
+        Task<SingleResult<TaskAssignmentDTO>> CreateAsync(TaskAssignmentCreateDTO task);
+        Task<SingleResult<TaskAssignmentDTO>> UpdateAsync(Guid id, TaskAssignmentUpdateDTO task);
         Task<SingleResult<TaskAssignmentDeletionDTO>> DeleteAsync(Guid id);
-        Task<SingleResult<TaskAssignment?>> GetAsync(Guid id);
-        Task<CollectionResult<TaskAssignment>> GetActiveByAuthorAsync(Guid id, string author);
-        Task<CollectionResult<TaskAssignment>> GetByStatus(ETaskStatus status);
+        Task<SingleResult<TaskAssignmentDTO?>> GetAsync(Guid id);
+        Task<CollectionResult<TaskAssignmentDTO>> GetActiveByAuthorAsync(string author);
+        Task<CollectionResult<TaskAssignmentDTO>> GetByStatus(string status);
     }
 }

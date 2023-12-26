@@ -12,14 +12,14 @@ namespace BTG.Task.Domain.Services
     {
         private TaskAssignment _model;
 
-        public TaskBuilder(string title, string author, DateTime dueDate)
+        public TaskBuilder(string title, string author, DateTime? dueDate)
         {
             _model = new(title, author, dueDate);
         }
 
         internal TaskAssignment Build()
         {
-            if (_model.DeadLine < DateTime.UtcNow)
+            if (_model.DeadLine is null || _model.DeadLine < DateTime.UtcNow) // DeadLine shouldnt be less than now
                 _model.DeadLine = GetDefaultDeadLine();
 
             if (string.IsNullOrEmpty(_model.Title) || string.IsNullOrEmpty(_model.Responsible))

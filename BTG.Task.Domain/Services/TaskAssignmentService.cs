@@ -1,6 +1,7 @@
 ﻿using BTG.Task.Domain.Entities;
 using BTG.Task.Domain.Enums;
 using BTG.Task.Domain.Exceptions;
+using BTG.Task.Domain.Services.Notification;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -14,7 +15,7 @@ namespace BTG.Task.Domain.Services
 {
     public sealed class TaskAssignmentService
     {
-        public TaskAssignment Create(string title, string responsible, DateTime deadLine)
+        public TaskAssignment Create(string title, string responsible, DateTime? deadLine)
         {
             TaskBuilder builder = new(title, responsible, deadLine);
             TaskAssignment task = builder.Build();
@@ -36,6 +37,8 @@ namespace BTG.Task.Domain.Services
         public TaskAssignment CloseTask(TaskAssignment task)
         {
             task.CompletedOn = DateTime.UtcNow;
+            task.Status = ETaskStatus.Closed;
+            NotificationService.SendClosedNotification(task);
             return task;
         }
     }

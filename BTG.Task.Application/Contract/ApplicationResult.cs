@@ -18,7 +18,7 @@ namespace BTG.Task.Application.Contract
                 return Errors.Count == 0;
             }
         }
+        [JsonIgnore]
         public List<string> Errors { get; set; } = [];
-        public ActivityTraceId TraceId { get; set; } = new ActivityTraceId();
     }
 }

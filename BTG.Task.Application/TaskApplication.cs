@@ -1,8 +1,10 @@
 ﻿using BTG.Task.Application.Contract;
 using BTG.Task.Application.DTOs;
+using BTG.Task.Application.Extensions;
 using BTG.Task.Application.Repository;
 using BTG.Task.Domain.Entities;
 using BTG.Task.Domain.Enums;
+using BTG.Task.Domain.Exceptions;
 using BTG.Task.Domain.Services;
 using System;
 using System.Collections.Generic;
@@ -13,47 +15,78 @@ using System.Threading.Tasks;
 
 namespace BTG.Task.Application
 {
-    public class TaskApplication(ITaskRepository repository, TaskAssignmentService taskService) : ITaskApplication
+    public class TaskApplication(ITaskRepository repository) : ITaskApplication
     {
         private readonly ITaskRepository _repository = repository;
-        private readonly TaskAssignmentService _taskService = taskService;
+        private readonly TaskAssignmentService _taskService = new();
 
-        public async Task<SingleResult<TaskAssignment>> CreateAsync(TaskAssignmentCreateDTO task)
+        public async Task<SingleResult<TaskAssignmentDTO>> CreateAsync(TaskAssignmentCreateDTO task)
         {
-            // Add validator
-            TaskAssignment domainTask = _taskService.Create(task.Title, task.Responsible, task.DeadLine);
-            await _repository.SaveAsync(domainTask);
+            SingleResult<TaskAssignmentDTO> result = new(default);
 
-            return new SingleResult<TaskAssignment>(domainTask);
+            try
+            {
+                TaskAssignment domainTask = _taskService.Create(task.Title, task.Responsible, task.DeadLine);
+                await _repository.SaveAsync(domainTask);
+                result.Value = domainTask.ToContract();
+            }
+            catch (InvalidTaskStateException ex)
+            {
+                result.Errors.Add(ex.Message);
+            }
+
+            return result;
         }
 
         public async Task<SingleResult<TaskAssignmentDeletionDTO>> DeleteAsync(Guid id)
         {
-            await _repository.DeleteAsync(id);
-            return new SingleResult<TaskAssignmentDeletionDTO>(new("Task successfully deleted"));
+            SingleResult<TaskAssignmentDeletionDTO> result = new(default);
+
+            TaskAssignment? task = await _repository.GetAsync(id);
+            
+            if (task is not null)
+            {
+                await _repository.DeleteAsync(id);
+                result.Value = new("Task successfully deleted");
+                return result;
+            }
+
+            result.Errors.Add($"Task {id} not found.");
+            return result;
         }
 
-        public async Task<CollectionResult<TaskAssignment>> GetActiveByAuthorAsync(Guid id, string author)
+        public async Task<CollectionResult<TaskAssignmentDTO>> GetActiveByAuthorAsync(string author)
         {
-            IEnumerable<TaskAssignment> response = await _repository.GetActiveByAuthorAsync(id, author);
-            return new CollectionResult<TaskAssignment>(response);
+            IEnumerable<TaskAssignment> response = await _repository.GetActiveByAuthorAsync(author);
+            return new CollectionResult<TaskAssignmentDTO>(response.ToContract());
         }
 
-        public async Task<SingleResult<TaskAssignment?>> GetAsync(Guid id)
+        public async Task<SingleResult<TaskAssignmentDTO?>> GetAsync(Guid id)
         {
             TaskAssignment? persistedTask = await _repository.GetAsync(id);
-            return new SingleResult<TaskAssignment?>(persistedTask);
+            return new SingleResult<TaskAssignmentDTO?>(persistedTask?.ToContract());
         }
 
-        public async Task<CollectionResult<TaskAssignment>> GetByStatus(ETaskStatus status)
+        public async Task<CollectionResult<TaskAssignmentDTO>> GetByStatus(string status)
         {
-            IEnumerable<TaskAssignment> response = await _repository.GetByStatus(status);
-            return new CollectionResult<TaskAssignment>(response);
+            CollectionResult<TaskAssignmentDTO> result = new();
+            try
+            {
+                InvalidTaskStatusException.ThrowIfInvalid(status);
+                ETaskStatus enumStatus = (ETaskStatus)Enum.Parse(typeof(ETaskStatus), status);
+                IEnumerable<TaskAssignment> response = await _repository.GetByStatus(enumStatus);
+                return new CollectionResult<TaskAssignmentDTO>(response.ToContract());
+            }
+            catch (InvalidTaskStatusException ex)
+            {
+                result.Errors.Add(ex.Message);
+            }
+            return result;
         }
 
-        public async Task<SingleResult<TaskAssignment>> UpdateAsync(Guid id, TaskAssignmentUpdateDTO task)
+        public async Task<SingleResult<TaskAssignmentDTO>> UpdateAsync(Guid id, TaskAssignmentUpdateDTO task)
         {
-            SingleResult<TaskAssignment> result = new(default);
+            SingleResult<TaskAssignmentDTO> result = new(default);
 
             TaskAssignment? persistedTask = await _repository.GetAsync(id);
 
@@ -65,9 +98,9 @@ namespace BTG.Task.Application
 
             try
             {
-                VerifyStatusChanged(ref persistedTask, task);
+                VerifyStatusChangedAndMerge(ref persistedTask, task);
                 await _repository.SaveAsync(persistedTask);
-                result.Value = persistedTask;
+                result.Value = persistedTask.ToContract();
             }
             catch(Exception ex)
             {
@@ -77,12 +110,16 @@ namespace BTG.Task.Application
             return result;
         }
 
-        private void VerifyStatusChanged(ref TaskAssignment oldTask, TaskAssignmentUpdateDTO newTaskMap)
+        private void VerifyStatusChangedAndMerge(ref TaskAssignment oldTask, TaskAssignmentUpdateDTO newTaskMap)
         {
-            if (newTaskMap.Status != oldTask.Status)
-            {
-                _taskService.ChangeStatus(oldTask, newTaskMap.Status);
-            }
+            InvalidTaskStatusException.ThrowIfInvalid(newTaskMap.Status);
+            ETaskStatus newStatus = (ETaskStatus)Enum.Parse(typeof(ETaskStatus), newTaskMap.Status);
+
+            if (newStatus != oldTask.Status)
+                _taskService.ChangeStatus(oldTask, newStatus);
+
+            oldTask.Merge(newTaskMap);
+            oldTask.UpdatedAt = DateTime.UtcNow;
         }
     }
 }
